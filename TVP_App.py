@@ -45,17 +45,18 @@ with st.sidebar.expander("Option 1: Upload CSV File"):
 with st.sidebar.expander("Option 2: Fill Out Form"):
     st.write("Enter the data manually using the form below.")
     default_df = pd.read_csv('Traffic_Volume.csv')
-    #default_df = default_df.dropna().reset_index(drop = True) 
-    # Sidebar input fields for input features
-    holiday = st.selectbox('Choose whether today is a designated holiday or not', options = ["None", "Columbus Day", "Veterans Day", "Thanksgiving Day", "Christmas Day", "New Years Day", "Washingtons Birthday", "Memorial Day", "Independence Day", "State Fair", "Labor Day", "Martin Luther King Jr Day"], help="Whether the day is a holiday or not")
-    temp = st.number_input('Average temperature in Kelvin', help="Temperature in Kelvin")
-    rain_1h = st.number_input('Rainfall in last 1 hour (mm)', help="Rainfall in last 1 hour (mm)")
-    snow_1h = st.number_input('Snowfall in last 1 hour (mm)', help="Snowfall in last 1 hour (mm)")
-    clouds_all = st.number_input('Percentage of cloud cover', help="Cloudiness (0-100%)")
-    weather_main = st.selectbox('Choose the current weather', options = default_df['weather_main'].unique(), help="Current weather condition")
-    date = st.date_input('Date', help="Date of interest")
-    time = st.time_input('Time', help="Time of interest")
-    predict_button = st.button("Submit Form Data")
+    with st.form(key='input_form'):
+        #default_df = default_df.dropna().reset_index(drop = True) 
+        # Sidebar input fields for input features
+        holiday = st.selectbox('Choose whether today is a designated holiday or not', options = ["None", "Columbus Day", "Veterans Day", "Thanksgiving Day", "Christmas Day", "New Years Day", "Washingtons Birthday", "Memorial Day", "Independence Day", "State Fair", "Labor Day", "Martin Luther King Jr Day"], help="Whether the day is a holiday or not")
+        temp = st.number_input('Average temperature in Kelvin', help="Temperature in Kelvin")
+        rain_1h = st.number_input('Rainfall in last 1 hour (mm)', help="Rainfall in last 1 hour (mm)")
+        snow_1h = st.number_input('Snowfall in last 1 hour (mm)', help="Snowfall in last 1 hour (mm)")
+        clouds_all = st.number_input('Percentage of cloud cover', help="Cloudiness (0-100%)")
+        weather_main = st.selectbox('Choose the current weather', options = default_df['weather_main'].unique(), help="Current weather condition")
+        date = st.date_input('Date', help="Date of interest")
+        time = st.time_input('Time', help="Time of interest")
+        predict_button = st.form_submit_button("Submit Form Data")
 
     # combine seperate date & time inputs
     date_time = datetime.combine(date, time)
@@ -69,6 +70,21 @@ with st.sidebar.expander("Option 2: Fill Out Form"):
     dayofweek = date_time.weekday()
     month = date_time.month
 
+    # session state to store data so new predictions with an updated alpha can be made without having to resubmit form
+        # NOTE used ChatGPT for the input structure in session_state
+    if predict_button:
+        st.session_state['inputs'] = {
+            'holiday': holiday,
+            'temp': temp,
+            'rain_1h': rain_1h,
+            'snow_1h': snow_1h,
+            'clouds_all': clouds_all,
+            'weather_main': weather_main,
+            'hour': hour,
+            'dayofweek': dayofweek,
+            'month': month
+        }
+
 
 # Display prompt to input data if no data has been submitted yet
 if traffic_file is None and predict_button == False:
@@ -76,7 +92,6 @@ if traffic_file is None and predict_button == False:
 
 # Confidence level slider
 alpha_input = st.slider("Confidence Level for Prediction Interval", min_value=0.01, max_value=0.5, value=0.1, step=0.01)
-
 
 
 # If There Is A CSV
@@ -109,7 +124,6 @@ if traffic_file is not None:
     # Ensure the order of columns in user data is in the same order as that of original data
     user_df = user_df[original_df.columns]# display dataframe head for checking
 
-
     # data previews for debugging
     # st.write("### OG Data Preview")
     # st.dataframe(original_df.head())
@@ -122,7 +136,6 @@ if traffic_file is not None:
     # user_df['dayofweek'] = user_df['date_time'].dt.dayofweek
     # user_df['month'] = user_df['date_time'].dt.month
     # user_df.drop(columns=['date_time'], inplace=True)
-
 
     # Concatenate two dataframes together along rows (axis = 0)
     combined_df = pd.concat([original_df, user_df], axis = 0)
@@ -151,14 +164,15 @@ if traffic_file is not None:
     user_df['Prediction Interval Upper Bound'] = prediction_interval[:, 1]
     user_df['Alpha'] = alpha_input
 
-
     # Show the predicted volume on the app
     st.subheader("Predicted Traffic Volume from Uploaded CSV:")
     st.dataframe(user_df)
 
 
 # If No CSV ...
-if predict_button == True:
+if 'inputs' in st.session_state:
+    inputs = st.session_state['inputs']
+    
     # Encode the inputs for model prediction
     encode_df = default_df.copy()
     encode_df = encode_df.drop(columns = ['traffic_volume'])
@@ -170,6 +184,16 @@ if predict_button == True:
     encode_df['month'] = encode_df['date_time'].dt.month
     encode_df.drop(columns=['date_time'], inplace=True)
 
+    # unpack from session_state input
+    holiday = inputs['holiday']
+    temp = inputs['temp']
+    rain_1h = inputs['rain_1h']
+    snow_1h = inputs['snow_1h']
+    clouds_all = inputs['clouds_all']
+    weather_main = inputs['weather_main']
+    hour = inputs['hour']
+    dayofweek = inputs['dayofweek']
+    month = inputs['month']
 
     # Combine the list of user inputed data as a row to default_df
     encode_df.loc[len(encode_df)] = [holiday, temp, rain_1h, snow_1h, clouds_all, weather_main, hour, dayofweek, month]
