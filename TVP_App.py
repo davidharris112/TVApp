@@ -1,5 +1,4 @@
 # Import necessary libraries
-
 import streamlit as st
 import pickle
 import matplotlib.pyplot as plt
@@ -21,6 +20,7 @@ st.image('traffic_image.gif', width = 600)
 
 # Load the pre-trained model from the pickle file
 # Get path relative to current script
+    # NOTE this was from one of my previous apps, but the initial idea from from ChatGPT and solved an issue with deploying the app on streamlit
 BASE_DIR = os.path.dirname(__file__)
 pickle_path = os.path.join(BASE_DIR, "traffic_volume.pickle")
 with open(pickle_path, "rb") as XGB_pickle:
@@ -57,6 +57,7 @@ with st.sidebar.expander("Option 2: Fill Out Form"):
     time = st.time_input('Time', help="Time of interest")
     predict_button = st.button("Submit Form Data")
 
+    # combine seperate date & time inputs
     date_time = datetime.combine(date, time)
 
     # convert Holiday to NaN if "none" was selected
@@ -88,11 +89,8 @@ if traffic_file is not None:
     #user_df = user_df.dropna().reset_index(drop = True) 
     #original_df = original_df.dropna().reset_index(drop = True)
 
-    # Remove output (price) column from original data
+    # Remove output column from original data
     original_df = original_df.drop(columns = ['traffic_volume'])
-    # Remove year column from user data
-    #user_df = user_df.drop(columns = ['year'])
-
 
     # fix datetime format in original df
     original_df['date_time'] = pd.to_datetime(original_df['date_time'])
@@ -142,7 +140,6 @@ if traffic_file is not None:
     # Predictions for user data
     user_pred, prediction_interval = XGb_reg.predict(user_df_encoded, alpha=alpha_input)
 
-
     # Predicted volume
     user_pred_TrafficVolume = user_pred
 
@@ -161,20 +158,17 @@ if traffic_file is not None:
 
 
 # If No CSV ...
-
 if predict_button == True:
     # Encode the inputs for model prediction
     encode_df = default_df.copy()
     encode_df = encode_df.drop(columns = ['traffic_volume'])
 
-    # fix datetime format in encode df
+    # fix datetime format in encode_df
     encode_df['date_time'] = pd.to_datetime(encode_df['date_time'])
     encode_df['hour'] = encode_df['date_time'].dt.hour
     encode_df['dayofweek'] = encode_df['date_time'].dt.dayofweek
     encode_df['month'] = encode_df['date_time'].dt.month
     encode_df.drop(columns=['date_time'], inplace=True)
-
-
 
 
     # Combine the list of user inputed data as a row to default_df
@@ -189,21 +183,13 @@ if predict_button == True:
     # Using predict() with new data provided by the user
     new_prediction, prediction_interval = XGb_reg.predict(user_encoded_df, alpha=alpha_input)
 
-
     # Show the predicted price on the app
     st.subheader("Predicted Traffic Volume from Form Data:")
     st.subheader(round(new_prediction[0]))
 
-    # chatgpt help for formatting this:
+    # NOTE used ChatGPT to help with formating this
     st.write(f"Prediction Interval ({(1 - alpha_input) * 100:.0f}%): "
                     f"[{float(prediction_interval[0][0]):.0f}, {float(prediction_interval[0][1]):.0f}]")
-
-# st.subheader("Predicting Traffic Volume")
-# st.success('**We predict your traffic volume to be {} vehicles**'.format(round(new_prediction[0])) + " with a confidence level of {}%".format((1 - alpha_input) * 100))
-#st.write(f"Prediction Interval: {prediction_interval} (α = {alpha_input})")
-
-
-
 
 
 # display model information even if no prediction has been made yet
