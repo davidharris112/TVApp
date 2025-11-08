@@ -1,5 +1,5 @@
 # Import necessary libraries
-from pyexpat import features
+
 import streamlit as st
 import pickle
 import matplotlib.pyplot as plt
