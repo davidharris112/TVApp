@@ -39,6 +39,7 @@ with st.sidebar.expander("Option 1: Upload CSV File"):
     sample_csv = pd.read_csv("traffic_data_user.csv") 
     st.write("Example Data Format")
     st.dataframe(sample_csv)
+    st.warning("Ensure your uploaded file has the same column names and data types as shown above.")
 
 
 with st.sidebar.expander("Option 2: Fill Out Form"):
@@ -54,9 +55,11 @@ with st.sidebar.expander("Option 2: Fill Out Form"):
     weather_main = st.selectbox('Choose the current weather', options = default_df['weather_main'].unique(), help="Current weather condition")
     date = st.date_input('Date', help="Date of interest")
     time = st.time_input('Time', help="Time of interest")
+    predict_button = st.button("Submit Form Data")
+
     date_time = datetime.combine(date, time)
 
-    # convert Holiday
+    # convert Holiday to NaN if "none" was selected
     if holiday == 'None':
         holiday = np.nan
 
@@ -65,54 +68,18 @@ with st.sidebar.expander("Option 2: Fill Out Form"):
     dayofweek = date_time.weekday()
     month = date_time.month
 
+
+# Display prompt to input data if no data has been submitted yet
+if traffic_file is None and predict_button == False:
+        st.info("Please enter data using one of the methods in the sidebar.")
+
+# Confidence level slider
 alpha_input = st.slider("Confidence Level for Prediction Interval", min_value=0.01, max_value=0.5, value=0.1, step=0.01)
 
 
-# If No CSV ...
-if traffic_file is None:
-    # Encode the inputs for model prediction
-    encode_df = default_df.copy()
-    encode_df = encode_df.drop(columns = ['traffic_volume'])
-
-    # fix datetime format in encode df
-    encode_df['date_time'] = pd.to_datetime(encode_df['date_time'])
-    encode_df['hour'] = encode_df['date_time'].dt.hour
-    encode_df['dayofweek'] = encode_df['date_time'].dt.dayofweek
-    encode_df['month'] = encode_df['date_time'].dt.month
-    encode_df.drop(columns=['date_time'], inplace=True)
-
-
-
-
-    # Combine the list of user inputed data as a row to default_df
-    encode_df.loc[len(encode_df)] = [holiday, temp, rain_1h, snow_1h, clouds_all, weather_main, hour, dayofweek, month]
-
-    # Create dummies for encode_df
-    encode_dummy_df = pd.get_dummies(encode_df)
-
-    # Extract encoded user data
-    user_encoded_df = encode_dummy_df.tail(1)
-
-    # Using predict() with new data provided by the user
-    new_prediction, prediction_interval = XGb_reg.predict(user_encoded_df, alpha=alpha_input)
-
-
-    # Show the predicted price on the app
-    st.write("Predicted Traffic Volume:")
-    st.subheader(round(new_prediction[0]))
-
-    # chatgpt help for formatting this:
-    st.write(f"Prediction Interval ({(1 - alpha_input) * 100:.0f}%): "
-                      f"[{float(prediction_interval[0][0]):.0f}, {float(prediction_interval[0][1]):.0f}]")
-
-
-
-    # st.subheader("Predicting Traffic Volume")
-    # st.success('**We predict your traffic volume to be {} vehicles**'.format(round(new_prediction[0])) + " with a confidence level of {}%".format((1 - alpha_input) * 100))
-    #st.write(f"Prediction Interval: {prediction_interval} (α = {alpha_input})")
 
 # If There Is A CSV
-else:
+if traffic_file is not None:
     # Loading data
     user_df = pd.read_csv(traffic_file) # User provided data
     original_df = pd.read_csv('Traffic_Volume.csv') # Original data used to create ML model
@@ -189,9 +156,57 @@ else:
 
 
     # Show the predicted volume on the app
-    st.subheader("Predicting Traffic Volume")
+    st.subheader("Predicted Traffic Volume from Uploaded CSV:")
     st.dataframe(user_df)
 
+
+# If No CSV ...
+
+if predict_button == True:
+    # Encode the inputs for model prediction
+    encode_df = default_df.copy()
+    encode_df = encode_df.drop(columns = ['traffic_volume'])
+
+    # fix datetime format in encode df
+    encode_df['date_time'] = pd.to_datetime(encode_df['date_time'])
+    encode_df['hour'] = encode_df['date_time'].dt.hour
+    encode_df['dayofweek'] = encode_df['date_time'].dt.dayofweek
+    encode_df['month'] = encode_df['date_time'].dt.month
+    encode_df.drop(columns=['date_time'], inplace=True)
+
+
+
+
+    # Combine the list of user inputed data as a row to default_df
+    encode_df.loc[len(encode_df)] = [holiday, temp, rain_1h, snow_1h, clouds_all, weather_main, hour, dayofweek, month]
+
+    # Create dummies for encode_df
+    encode_dummy_df = pd.get_dummies(encode_df)
+
+    # Extract encoded user data
+    user_encoded_df = encode_dummy_df.tail(1)
+
+    # Using predict() with new data provided by the user
+    new_prediction, prediction_interval = XGb_reg.predict(user_encoded_df, alpha=alpha_input)
+
+
+    # Show the predicted price on the app
+    st.subheader("Predicted Traffic Volume from Form Data:")
+    st.subheader(round(new_prediction[0]))
+
+    # chatgpt help for formatting this:
+    st.write(f"Prediction Interval ({(1 - alpha_input) * 100:.0f}%): "
+                    f"[{float(prediction_interval[0][0]):.0f}, {float(prediction_interval[0][1]):.0f}]")
+
+# st.subheader("Predicting Traffic Volume")
+# st.success('**We predict your traffic volume to be {} vehicles**'.format(round(new_prediction[0])) + " with a confidence level of {}%".format((1 - alpha_input) * 100))
+#st.write(f"Prediction Interval: {prediction_interval} (α = {alpha_input})")
+
+
+
+
+
+# display model information even if no prediction has been made yet
 # Showing additional items in tabs
 st.subheader("Model Performance and Inference")
 tab1, tab2, tab3, tab4 = st.tabs(["Feature Importance", "Residuals Histogram", "Predicited vs Actual", "Coverage Plot"])
