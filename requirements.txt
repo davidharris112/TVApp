@@ -5,3 +5,4 @@ streamlit==1.49.1
 scikit-learn==1.5.2
 datetime==5.1
 mapie==0.9.1
+xgboost==1.7.6
